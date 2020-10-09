@@ -1,0 +1,113 @@
+/************CONSTANTS***********/
+var ORGNAME_COL_POWER = 1;
+var EMAILED_COL_POWER = 3;
+var RESPONSE_COL_POWER = 4;
+var DATE_LAST_CONTACTED_COL_POWER = 5;
+var CALL_LOG_COL_POWER = 6;
+var POI_COL_POWER = 7;
+var TITLE_POI_COL_POWER = 8;
+var PHONE_COL_POWER = 9;
+var CITY_COL_POWER = 10;
+var STATE_COL_POWER = 11;
+var ZIPCODE_COL_POWER = 12;
+var EMAIL_COL_POWER = 13;
+var WHOFOUND_COL_POWER = 14;
+var WHEREFROM_COL_POWER = 15;
+var TYPEFOOD_COL_POWER = 16;
+var NOTES_COL_POWER = 17;
+var CALL_NOTES_COL_POWER = 18;
+
+var ORGNAME_COL_MASTER = 1;
+var EMAILED_COL_MASTER = 2;
+var RESPONSE_COL_MASTER= 3;
+var DATE_LAST_CONTACTED_COL_MASTER = 5;
+var CALL_LOG_COL_MASTER = 6;
+var POI_COL_MASTER = 7;
+var TITLE_POI_COL_MASTER = 8;
+var PHONE_COL_MASTER = 9;
+var CITY_COL_MASTER = 11;
+var STATE_COL_MASTER = 12;
+var ZIPCODE_COL_MASTER = 13;
+var EMAIL_COL_MASTER = 14;
+var WHOFOUND_COL_MASTER = 15;
+var WHEREFROM_COL_MASTER = 16;
+var TYPEFOOD_COL_MASTER = 17;
+var NOTES_COL_MASTER = 18;
+var CALL_NOTES_COL_MASTER = 19;
+
+
+var MASTER_COL_POWER_LIST = [ORGNAME_COL_POWER, EMAILED_COL_POWER, RESPONSE_COL_POWER,
+                       DATE_LAST_CONTACTED_COL_POWER, CALL_LOG_COL_POWER, POI_COL_POWER, TITLE_POI_COL_POWER, PHONE_COL_POWER, CITY_COL_POWER, STATE_COL_POWER, 
+                       ZIPCODE_COL_POWER, EMAIL_COL_POWER, WHOFOUND_COL_POWER, WHEREFROM_COL_POWER, TYPEFOOD_COL_POWER, NOTES_COL_POWER, CALL_NOTES_COL_POWER]
+
+var MASTER_COL_MASTER_LIST = [ORGNAME_COL_MASTER, EMAILED_COL_MASTER, RESPONSE_COL_MASTER,
+                       DATE_LAST_CONTACTED_COL_MASTER, CALL_LOG_COL_MASTER, POI_COL_MASTER, TITLE_POI_COL_MASTER, PHONE_COL_MASTER, CITY_COL_MASTER, STATE_COL_MASTER, 
+                       ZIPCODE_COL_MASTER, EMAIL_COL_MASTER, WHOFOUND_COL_MASTER, WHEREFROM_COL_MASTER, TYPEFOOD_COL_MASTER, NOTES_COL_MASTER, CALL_NOTES_COL_MASTER]
+
+//Constants
+var POWER_HOURS_HOME_NAME = "Power Hours Home";
+
+var START_ROW = 4;
+var SRC_SS_ID = '1-qvNjwEHPmol_VmJCLdPtlDFLslUFkazbZBuLkXEAw4';
+var master_sheet = SpreadsheetApp.openById(SRC_SS_ID);
+var DEST_SS_ID = '1MQyBjkZB6mb53y8Gr90YmFZ8j8iswz4BCAgRAMTG-Fw';
+var Power_Hours_sheet = SpreadsheetApp.openById(DEST_SS_ID);
+var template = Power_Hours_sheet.getSheetByName(POWER_HOURS_HOME_NAME).getRange("A1:W300");
+
+
+
+function BeginPowerHours() {
+    var ui = SpreadsheetApp.getUi();
+    var result = ui.prompt('Enter Name of Participants of Power Hours seperated by a Comma:',
+      ui.ButtonSet.OK_CANCEL)
+    var result2 = ui.prompt('Enter Category of Food to do Power Hours on; Please Note that is it Case-sensitive', ui.ButtonSet.OK_CANCEL)
+    
+    // Process the user's response.
+    var button = result.getSelectedButton();
+    var text = result.getResponseText();
+    var button2 = result2.getSelectedButton();
+    var text2 = result2.getResponseText();
+    var listOFpeople = [{}];
+    var listOFpeople = text.split(",")
+    Assign_Food_Banks(listOFpeople, text2) }
+    
+
+function Assign_Food_Banks(POWER_HOUR_TEAM, Food_Category){
+    for (i = 0; i < POWER_HOUR_TEAM.length; i++){
+      // sheet creation for power hours
+      Power_Hours_sheet.insertSheet(POWER_HOUR_TEAM[i]);
+      template.copyTo(Power_Hours_sheet.getSheetByName(POWER_HOUR_TEAM[i]).getRange("A1:W3"));
+    }
+    var sheets = Power_Hours_sheet.getSheets();
+    var newMasterSheet = master_sheet.getSheetByName(Food_Category);
+    var NumFarmsInCategory = newMasterSheet.getRange("A4:A").getValues().filter(String).length;
+    var j = 0; var k = 1;
+    while (j < (NumFarmsInCategory / 2)){  //iterate thru Farms
+      if (newMasterSheet.getRange(START_ROW + j, RESPONSE_COL_MASTER).getValue() != ("interested - need more info" || "interested - DEAL" || "no surplus but possible relationship" || "could not reach")){
+        if (k != sheets.length){  
+          //iterate thru sheets
+          var l = 0;
+          var CurrentPowerHoursSheet = SpreadsheetApp.openById(DEST_SS_ID).getSheetByName(sheets[k].getName());
+          var Last_Row_Power_Hours = CurrentPowerHoursSheet.getRange("A4:A").getValues().filter(String).length;
+          CurrentPowerHoursSheet.getRange(Last_Row_Power_Hours + START_ROW, 2).setValue(Food_Category);
+          while (l < MASTER_COL_POWER_LIST.length){
+              //iterate thru pasting info
+            var src_cell = newMasterSheet.getRange((NumFarmsInCategory - j + START_ROW),MASTER_COL_MASTER_LIST[l]); //iterate thru each row of food bank
+            var dest_cell = CurrentPowerHoursSheet.getRange(Last_Row_Power_Hours + START_ROW, MASTER_COL_POWER_LIST[l]);
+            dest_cell.setValue(src_cell.getValue());
+            //src_cell.clearContent();
+            l++;}
+          newMasterSheet.deleteRow((NumFarmsInCategory - j + START_ROW))
+          //Logger.log(START_ROW + j)
+        j++;
+        //Logger.log(j)
+        k++;
+      } else {
+        var k = 1;  
+      }    
+      
+      } else{
+        j++;
+      }
+    }
+}
