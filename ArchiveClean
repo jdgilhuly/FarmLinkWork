@@ -1,0 +1,136 @@
+/**
+ * Every night at 1am EST, the farms with "not interested" in the response column of 
+ * the farms call sheet are transferred to the 'Not Interested' sheet in 
+ * '[HISTORY/ARCHIVE] All Farms Results.' Farms marked 'interested - DEAL' are also deleted.
+ * https://docs.google.com/spreadsheets/d/1NTDU-xcZxBD5reXHHShYcv3we_gCxYC2vi374W1kjVo/edit#gid=1928204228
+ */
+
+/******* CONSTANTS *******/
+// Indices of each column in the CALLS sheet
+var RESPONSE_COL_CALLS = 3;
+var POI_COL_CALLS = 7;
+var ORGNAME_COL_CALLS = 1;
+var PHONE_COL_CALLS = 9;
+var LOC_COL_CALLS = 10;
+var CITY_COL_CALLS = 11;
+var STATE_COL_CALLS = 12;
+var ZIPCODE_COL_CALLS = 13;
+var EMAIL_COL_CALLS = 14;
+var WHOFOUND_COL_CALLS = 15;
+var WHEREFROM_COL_CALLS = 16;
+var TYPEFOOD_COL_CALLS = 17;
+var FARM_NOTES_COL_CALLS = 18;
+var CALL_NOTES_COL_CALLS = 19;
+
+// Indices of each column in the ARCHIVE sheet
+var DATE_COL_ARCH = 1;
+var ORGNAME_COL_ARCH = 2;
+var TYPEFOOD_COL_ARCH = 3;
+var LOC_COL_ARCH = 4;
+var CITY_COL_ARCH = 5;
+var STATE_COL_ARCH = 6;
+var ZIPCODE_COL_ARCH = 7;
+var PHONE_COL_ARCH = 8;
+var EMAIL_COL_ARCH = 9;
+var POI_COL_ARCH = 10;
+var FARM_NOTES_COL_ARCH = 12;
+var CALL_NOTES_COL_ARCH = 13;
+
+// Indices of each column in the DEALS sheet
+var ORGNAME_COL_DEALS = 4;
+
+// Arrays of column indices for both the calls and archive sheets, corresponding
+var CALLS_TO_ARCH_COL_LIST = [ORGNAME_COL_CALLS, ORGNAME_COL_CALLS, POI_COL_CALLS, TYPEFOOD_COL_CALLS, LOC_COL_CALLS, CITY_COL_CALLS, STATE_COL_CALLS, ZIPCODE_COL_CALLS, PHONE_COL_CALLS, 
+                              EMAIL_COL_CALLS, FARM_NOTES_COL_CALLS, CALL_NOTES_COL_CALLS];
+var ARCH_COL_LIST = [ORGNAME_COL_ARCH, ORGNAME_COL_ARCH, POI_COL_ARCH,TYPEFOOD_COL_ARCH, LOC_COL_ARCH, CITY_COL_ARCH, STATE_COL_ARCH, ZIPCODE_COL_ARCH, PHONE_COL_ARCH, 
+                     EMAIL_COL_ARCH,  FARM_NOTES_COL_ARCH, CALL_NOTES_COL_ARCH];
+
+// Other constants
+var START_ROW_CALLS = 4;
+var START_ROW_DEST = 2;
+
+var POTENTIAL_DEALS_SHT = "Potential Deals";
+var NOT_INTERESTED_SHT = "Not Interested";
+
+var CALLS_SS_ID = '1-qvNjwEHPmol_VmJCLdPtlDFLslUFkazbZBuLkXEAw4';
+var DEALS_SS_ID = '1O37HpSCtM8t2sf73WPv9uOO2br2quLIQA9SgDO483tw';
+var ARCHIVE_SS_ID = '1NTDU-xcZxBD5reXHHShYcv3we_gCxYC2vi374W1kjVo';
+
+//function createTrigger() {
+//  // Trigger every night at 1am EST.
+//  ScriptApp.newTrigger('nightlyClean')
+//      .timeBased()
+//      .everyDays(1)
+//      .atHour(1)
+//      .create();
+//}
+
+function copyToArchiveAndDelete(row_num, calls_sheet) {
+  // Check if row_num argument has the "not interested" response.
+  var response = calls_sheet.getRange(row_num, RESPONSE_COL_CALLS).getValue();
+  var archive_sheet = SpreadsheetApp.openById(ARCHIVE_SS_ID).getSheetByName(NOT_INTERESTED_SHT);
+
+  // Get the index of the last row that has content in the Not Interested sheet.
+  var last_row_archive = archive_sheet.getLastRow();
+  
+  // For each corresponding column in both column lists, copy values in the Calls sheet 
+  // and paste below the last row with content in the Not Interested sheet.
+  for (i = 0; i < CALLS_TO_ARCH_COL_LIST.length; i++) {
+    var src_cell = calls_sheet.getRange(row_num, CALLS_TO_ARCH_COL_LIST[i]);
+    var dest_cell = archive_sheet.getRange(last_row_archive + 1, ARCH_COL_LIST[i]);
+    dest_cell.setValue(src_cell.getValue());
+  }
+  
+  // Add current date to date column of Not Interested sheet.
+  var today = Utilities.formatDate(new Date(), "EST", "EEE, MM/dd/yyyy, HH:mm z");
+  archive_sheet.getRange(last_row_archive + 1, DATE_COL_ARCH).setValue(today);
+  
+  // Delete the row from the calls sheet.
+  calls_sheet.deleteRow(row_num);
+}
+
+function nightlyClean() {
+  var sheets = SpreadsheetApp.getActiveSpreadsheet().getSheets();
+  
+  // Loop through each sheet in calls spreadsheet.
+  for (var s = 0; s < sheets.length - 2; s++ ) {
+    var sheet = sheets[s];
+    
+    // Determine number of rows containing data by counting the number of organization names.
+    var num_rows = sheet.getRange("A4:A").getValues().filter(String).length;
+    if (num_rows < 1) {
+      continue;
+    }
+    var response_col_vals = sheet.getSheetValues(START_ROW_CALLS, RESPONSE_COL_CALLS, num_rows, 1);
+    response_col_vals = [].concat.apply([], response_col_vals);
+    var rows_deleted = 0;
+    
+    for (var i = 0; i < num_rows; i++) {
+      var response = response_col_vals[i];
+      var row_num = i + START_ROW_CALLS - rows_deleted;
+      var response_val = sheet.getRange(row_num, RESPONSE_COL).getValue();
+      
+      if (response == 'could not reach' && response == response_val) {
+        copyToArchiveAndDelete(row_num, sheet);
+        rows_deleted++;
+        
+      // Copy and delete row if response is 'not interested'.
+      } else if (response == 'not interested' && response == response_val) {
+        copyToArchiveAndDelete(row_num, sheet);
+        rows_deleted++;
+        
+      // Delete row if response is 'interested - DEAL' after checking if it exists 
+      // in Potential Deals sheet. 
+      } else if (response == 'interested - DEAL') {
+        var farm_name = sheet.getRange(row_num, ORGNAME_COL_CALLS).getValue();
+        var deals_sheet = SpreadsheetApp.openById(DEALS_SS_ID).getSheetByName(POTENTIAL_DEALS_SHT);
+        var deals_farms_col_vals = deals_sheet.getSheetValues(START_ROW_DEST, ORGNAME_COL_DEALS, deals_sheet.getLastRow(), 1);
+        deals_farms_col_vals = [].concat.apply([], deals_farms_col_vals);
+        if (deals_farms_col_vals.includes(farm_name)) {
+          sheet.deleteRow(row_num);
+          rows_deleted++;
+        }
+      }
+    }
+  }
+}
